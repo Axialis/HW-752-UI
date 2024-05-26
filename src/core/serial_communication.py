@@ -4,9 +4,9 @@ import serial as sp
 
 class Communication:
     def __init__(self):
-        self._frequency_1_ch: int = 1
-        self._frequency_2_ch: int = 1
-        self._frequency_3_ch: int = 1
+        self._frequency_1_ch: int = 100
+        self._frequency_2_ch: int = 100
+        self._frequency_3_ch: int = 100
 
         self._duty_1_ch: int = 50
         self._duty_2_ch: int = 50
@@ -48,7 +48,7 @@ class Communication:
     def disconnect_serial_port(self):
         self.serial_port.close()
 
-    def write_parameter_to_device(self, parameter: str, value: str):
+    def write_parameter_to_device(self, parameter: str, value: str) -> str:
         if parameter == "F":
             data = self.format_frequency(value)
         elif parameter in {"D1", "D2", "D3"}:
@@ -58,11 +58,13 @@ class Communication:
 
         if data:
             self.serial_port.write(data.encode('utf-8'))
+            answer = self.serial_port.readline().decode('utf-8').strip()
+            return answer
 
     def format_frequency(self, value: str) -> str:
         length = len(value)
         if length <= 3:
-            return f"F{value} Гц"
+            return f"F{value}"
         elif length == 4:
             return f"F{value[0]}.{value[1:]}"
         elif length == 5:
