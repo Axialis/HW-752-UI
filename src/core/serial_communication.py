@@ -1,65 +1,73 @@
+import asyncio
 import serial.tools.list_ports
-import serial as sp
+import serial_asyncio as sa
 
 
 class Communication:
     def __init__(self):
-        self._frequency_1_ch: int = 100
-        self._frequency_2_ch: int = 100
-        self._frequency_3_ch: int = 100
-
+        self._frequency: int = 100
         self._duty_1_ch: int = 50
         self._duty_2_ch: int = 50
         self._duty_3_ch: int = 50
 
-        self.serial_port = None
+        self.serial_reader = None
+        self.serial_writer = None
 
-    def set_frequency(self, channel: int, value: int):
-        if channel == 1:
-            self._frequency_1_ch = value
-        if channel == 2:
-            self._frequency_2_ch = value
-        if channel == 3:
-            self._frequency_3_ch = value
+    def set_frequency(self, value: int):
+        self._frequency = value
 
-    def get_frequency(self, channel: int):
-        if channel == 1:
-            return self._frequency_1_ch
-        if channel == 2:
-            return self._frequency_2_ch
-        if channel == 3:
-            return self._frequency_3_ch
+    def get_frequency(self):
+        return self._frequency
+
+    def set_duty(self, duty_channel: str, value: int):
+        duty_map = {
+            "D1": "_duty_1_ch",
+            "D2": "_duty_2_ch",
+            "D3": "_duty_3_ch"
+        }
+        if duty_channel in duty_map:
+            setattr(self, duty_map[duty_channel], value)
+
+    def get_duty(self, duty_channel: str):
+        duty_map = {
+            "D1": "_duty_1_ch",
+            "D2": "_duty_2_ch",
+            "D3": "_duty_3_ch"
+        }
+        if duty_channel in duty_map:
+            return getattr(self, duty_map[duty_channel])
+        return None
 
     @staticmethod
     def read_ports_list() -> list:
-        return sp.tools.list_ports.comports()
+        return list(serial.tools.list_ports.comports())
 
-    def connect_to_serial_port(self, port: str):
+    async def connect_to_serial_port(self, port: str):
         try:
-            self.serial_port = sp.Serial(
-                port=port,
+            self.serial_reader, self.serial_writer = await sa.open_serial_connection(
+                url=port,
                 baudrate=9600,
-                stopbits=sp.STOPBITS_ONE,
-                parity=sp.PARITY_NONE
+                stopbits=sa.serial.STOPBITS_ONE,
+                parity=sa.serial.PARITY_NONE
             )
-        except sp.SerialException as e:
+        except sa.serial.SerialException as e:
             print(f"Can't open port {port}: {e}")
 
-    def disconnect_serial_port(self):
-        self.serial_port.close()
+    async def disconnect_serial_port(self):
+        self.serial_writer.close()
+        await self.serial_writer.wait_closed()
 
-    def write_parameter_to_device(self, parameter: str, value: str) -> str:
+    async def write_parameter_to_device(self, parameter: str, value: str) -> str:
         if parameter == "F":
             data = self.format_frequency(value)
         elif parameter in {"D1", "D2", "D3"}:
             data = self.format_duty(parameter, value)
-        else:
-            return
 
         if data:
-            self.serial_port.write(data.encode('utf-8'))
-            answer = self.serial_port.readline().decode('utf-8').strip()
-            return answer
+            self.serial_writer.write(data.encode('utf-8'))
+            await self.serial_writer.drain()
+            answer = await self.serial_reader.readline()
+            return answer.decode('utf-8').strip()
 
     def format_frequency(self, value: str) -> str:
         length = len(value)
@@ -83,7 +91,19 @@ class Communication:
             return f"{parameter}:00{value}"
         return ""
 
-    def read_all_parameters(self) -> str:
-        self.serial_port.write(b'read')
-        answer = self.serial_port.readline().decode('utf-8').strip()
-        return answer
+    async def read_all_parameters(self) -> str:
+        self.serial_writer.write(b'read')
+        await self.serial_writer.drain()
+        answer = await self.serial_reader.readline()
+        return answer.decode('utf-8').strip()
+
+    def parse_device_string(self, data: str) -> dict:
+        values = {}
+        parts = data.split(',')
+        for item in parts:
+            if item.startswith('F'):
+                values['F'] = int(item[1:])
+            elif ':' in item:
+                key, value = item.split(':')
+                values[key] = int(value)
+        return values
