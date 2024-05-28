@@ -12,6 +12,7 @@ class Communication:
 
         self.serial_reader = None
         self.serial_writer = None
+        self.lock = asyncio.Lock()
 
     def set_frequency(self, value: int):
         self._frequency = value
@@ -58,16 +59,17 @@ class Communication:
         await self.serial_writer.wait_closed()
 
     async def write_parameter_to_device(self, parameter: str, value: str) -> str:
-        if parameter == "F":
-            data = self.format_frequency(value)
-        elif parameter in {"D1", "D2", "D3"}:
-            data = self.format_duty(parameter, value)
+        async with self.lock:
+            if parameter == "F":
+                data = self.format_frequency(value)
+            elif parameter in {"D1", "D2", "D3"}:
+                data = self.format_duty(parameter, value)
 
-        if data:
-            self.serial_writer.write(data.encode('utf-8'))
-            await self.serial_writer.drain()
-            answer = await self.serial_reader.readline()
-            return answer.decode('utf-8').strip()
+            if data:
+                self.serial_writer.write(data.encode('utf-8'))
+                await self.serial_writer.drain()
+                answer = await self.serial_reader.readline()
+                return answer.decode('utf-8').strip()
 
     def format_frequency(self, value: str) -> str:
         length = len(value)
@@ -92,10 +94,11 @@ class Communication:
         return ""
 
     async def read_all_parameters(self) -> str:
-        self.serial_writer.write(b'read')
-        await self.serial_writer.drain()
-        answer = await self.serial_reader.readline()
-        return answer.decode('utf-8').strip()
+        async with self.lock:
+            self.serial_writer.write(b'read')
+            await self.serial_writer.drain()
+            answer = await self.serial_reader.readline()
+            return answer.decode('utf-8').strip()
 
     def parse_device_string(self, data: str) -> dict:
         values = {}

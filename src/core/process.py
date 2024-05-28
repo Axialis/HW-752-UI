@@ -1,3 +1,5 @@
+import asyncio
+
 import qasync
 from PySide6.QtCore import QObject
 from src.core.serial_communication import Communication
@@ -71,7 +73,22 @@ class ProcessHandler(QObject):
 
     @qasync.asyncSlot()
     async def set_value(self):
-        await self.communication.write_parameter_to_device("F", str(self.elements.freqSpinBox.value()))
-        await self.communication.write_parameter_to_device("D1", str(self.elements.d1SpinBox.value()))
-        await self.communication.write_parameter_to_device("D2", str(self.elements.d2SpinBox.value()))
-        await self.communication.write_parameter_to_device("D3", str(self.elements.d3SpinBox.value()))
+        self.elements.set_button.setDisabled(True)
+        answer = await self.communication.read_all_parameters()
+        parsed_answer = self.communication.parse_device_string(answer)
+
+        parameter_map = {
+            "F": self.elements.freqSpinBox,
+            "D1": self.elements.d1SpinBox,
+            "D2": self.elements.d2SpinBox,
+            "D3": self.elements.d3SpinBox
+        }
+
+        tasks = []
+        for key, spinbox in parameter_map.items():
+            if key in parsed_answer and parsed_answer[key] != spinbox.value():
+                tasks.append(self.communication.write_parameter_to_device(key, str(spinbox.value())))
+
+        await asyncio.gather(*tasks)
+        self.elements.set_button.setDisabled(False)
+
