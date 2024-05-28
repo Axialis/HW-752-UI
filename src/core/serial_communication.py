@@ -73,15 +73,14 @@ class Communication:
 
     def format_frequency(self, value: str) -> str:
         length = len(value)
-        if length <= 3:
+        if length == 3:
             return f"F{value}"
-        elif length == 4:
-            return f"F{value[0]}.{value[1:]}"
-        elif length == 5:
-            return f"F{value[:2]}.{value[2:]}"
-        elif length == 6:
-            return f"F{value[0]}.{value[1:3]}.{value[3:]}"
-        return ""
+        if length == 4:
+            return f"F{value[0]}.{value[1:3]}"
+        if length == 5:
+            return f"F{value[:2]}.{value[2]}"
+        if length == 6:
+            return f"F{value[0]}.{value[1]}.{value[2]}"
 
     def format_duty(self, parameter: str, value: str) -> str:
         length = len(value)
@@ -105,7 +104,17 @@ class Communication:
         parts = data.split(',')
         for item in parts:
             if item.startswith('F'):
-                values['F'] = int(item[1:])
+                if len(item) == 4:
+                    values['F'] = int(item[1:])
+                if len(item) == 5:
+                    if item[2] == ".":
+                        values['F'] = int(item[1:].replace('.', '')) * 10
+                    if item[3] == ".":
+                        values['F'] = int(item[1:].replace('.', '')) * 100
+                if len(item) == 6:
+                    values['F'] = int(item[1:].replace('.', '')) * 1000
+                else:
+                    pass
             elif ':' in item:
                 key, value = item.split(':')
                 values[key] = int(value)

@@ -37,4 +37,6 @@ def main():
     with loop:
         loop.run_forever()
 
-main()
+
+if __name__ == "__main__":
+    main()

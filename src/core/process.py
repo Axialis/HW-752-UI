@@ -27,6 +27,7 @@ class ProcessHandler(QObject):
         self.elements.disconnect_button.clicked.connect(self.disconnect_device)
         self.elements.set_button.clicked.connect(self.set_value)
 
+        self.elements.set_button.setDisabled(True)
     def change_field_value(self, element):
         actions = {
             "F": lambda: self.communication.set_frequency(self.elements.freqSpinBox.value()),
@@ -57,6 +58,7 @@ class ProcessHandler(QObject):
     @qasync.asyncSlot()
     async def connect_device(self):
         await self.communication.connect_to_serial_port(self.elements.comboBox.currentText())
+        self.elements.set_button.setDisabled(False)
         answer = await self.communication.read_all_parameters()
         parsed_answer = self.communication.parse_device_string(answer)
         for key, value in parsed_answer.items():
